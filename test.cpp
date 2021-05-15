@@ -4,7 +4,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
-#include <set>
+#include <vector>
 
 class FS : public fuse
 {
@@ -23,10 +23,29 @@ public:
     };
     std::map<std::string,File> files;
 
+    // files within a dir
+    std::vector<std::string> subfiles(std::string const & pathname)
+    {
+        std::vector<std::string> result;
+        size_t pathsize = pathname[pathname.size()-1] == '/' ? pathname.size() : pathname.size() + 1;
+
+        for (std::map<std::string,File>::iterator it = files.begin(); it != files.end(); ++ it) {
+
+            std::string const & filepath = it->first;
+            File & file = it->second;
+
+            if (file.name.size() + pathsize == filepath.size() && 0 == filepath.compare(0, pathname.size(), pathname)) {
+                // path in dir
+                result.push_back(filepath);
+            }
+        }
+        return result;
+    }
+
     void init()
     {
         files.clear();
-        files["/"] = File("", S_IFDIR | (0777 ^ umask));
+        files["/"] = File("root", S_IFDIR | (0777 ^ umask));
         files["/helloworld.txt"] = File("helloworld.txt", S_IFREG | (0666 ^ umask), "Hello, world.\n");
     }
 
@@ -53,17 +72,10 @@ public:
     int readdir(const std::string &pathname, off_t off, struct fuse_file_info *fi)
     {
         struct stat st;
-        memset(&st, 0, sizeof(st));
-        for (std::map<std::string,File>::iterator it = files.begin(); it != files.end(); ++ it) {
-            std::string const & filepath = it->first;
-            File & file = it->second;
-            if (file.name.size() + pathname.size() != filepath.size() || 0 != filepath.compare(0, pathname.size(), pathname)) {
-                // path not in dir
-                std::cout << pathname << ": Skipping " << filepath << ": " << file.name << std::endl;
-                continue;
-            }
-            getattr(filepath, &st);
-            fill_dir(file.name, &st, 0);
+        std::vector<std::string> files = subfiles(pathname);
+        for (size_t i = 0; i < files.size(); ++ i) {
+            getattr(files[i], &st);
+            fill_dir(this->files[files[i]].name, &st, 0);
         }
         return 0;
     }
@@ -132,37 +144,35 @@ public:
 
     int rmdir(const std::string &pathname)
     {
-        files.erase(pathname);
-        return 0;
+        if (subfiles(pathname).size() != 0) {
+            return -ENOTEMPTY;
+        } else {
+            files.erase(pathname);
+            return 0;
+        }
     }
 
     int rename(const std::string &oldpath, const std::string &newpath)
     {
-        files[oldpath].name = newpath.substr(newpath.rfind('/') + 1, newpath.size());
+        int result = 0;
+        size_t idx;
 
-        // loop moves files within directory when moving a directory by matching start of pathname
-        std::map<std::string,File> moving;
-        for (std::map<std::string,File>::iterator it = files.begin(); it != files.end();) {
-
-            std::string const & filepath = it->first;
-            File & file = it->second;
-
-            if (0 != filepath.compare(0, oldpath.size(), oldpath)) {
-                // unrelated path
-                ++ it;
-                continue;
+        std::vector<std::string> subfiles = this->subfiles(oldpath);
+        for (idx = 0; idx < subfiles.size() && 0 == result; ++ idx) {
+            result = rename(subfiles[idx], newpath + subfiles[idx].substr(oldpath.size()));
+        }
+        if (result != 0) {
+            while (idx > 0) {
+                -- idx;
+                rename(newpath + subfiles[idx].substr(oldpath.size()), subfiles[idx]);
             }
-            std::string newsubpath = newpath + filepath.substr(oldpath.size());
-            moving[newsubpath] = file;
-
-            std::map<std::string,File>::iterator old = it;
-            ++ it;
-            files.erase(old);
+        } else {
+            File file = files[oldpath];
+            files.erase(oldpath);
+            file.name = newpath.substr(newpath.rfind('/') + 1, newpath.size());
+            files[newpath] = file;
         }
-        for (std::map<std::string,File>::iterator it = moving.begin(); it != moving.end(); ++it) {
-            files[it->first] = it->second;
-        }
-        return 0;
+        return result;
     }
 };
 
