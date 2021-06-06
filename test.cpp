@@ -79,10 +79,12 @@ public:
   int readdir(const std::string &pathname, off_t off, struct fuse_file_info *fi,
               readdir_flags flags) override {
     struct stat st;
+    (void)off;
+    (void)fi;
     std::vector<std::string> files = subfiles(pathname);
     for (size_t i = 0; i < files.size(); ++i) {
       getattr(files[i], &st);
-      fill_dir(this->files[files[i]].name, &st, 0);
+      fill_dir(this->files[files[i]].name, &st, flags);
     }
     return 0;
   }
@@ -90,6 +92,7 @@ public:
   int read(const std::string &pathname, char *buf, size_t count, off_t offset,
            struct fuse_file_info *fi) override {
     std::string &content = files[pathname].content;
+    (void)fi;
     if (count + offset > content.size()) {
       if ((size_t)offset > content.size()) {
         count = 0;
@@ -117,6 +120,7 @@ public:
     std::string &content = files[pathname].content;
     size_t precount =
         offset + count > content.size() ? content.size() - offset : count;
+    (void)fi;
     content.replace(offset, precount, std::string(buf, buf + count));
     return count;
   }
@@ -131,6 +135,7 @@ public:
   }
 
   int mknod(const std::string &pathname, mode_t mode, dev_t dev) override {
+    (void)dev;
     files[pathname] = File(pathname.substr(pathname.rfind('/') + 1), mode);
     return 0;
   }
