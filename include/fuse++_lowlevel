@@ -1,10 +1,13 @@
 
+#include <functional>
+
 // queue: notification funcs, fuse_chan
 
 class fuse_lowlevel
 {
 public:
     fuse_lowlevel(struct fuse_args *args);
+    ~fuse_lowlevel(); // fuse_session_destroy
     
     /**
      * Exit a session
@@ -36,8 +39,6 @@ public:
      * @return 0 on success, -1 on error
      */
     int loop_mt();
-
-    ~fuse_lowlevel(); Destroy a session void fuse_session_destroy();
 
 protected:
 	/** User ID of the calling process */
@@ -111,7 +112,7 @@ protected:
          * @param e the entry parameters
          * @return zero for success, -errno for failure to send reply
          */
-        int reply_entry(fuse_req_t req, const struct fuse_entry_param *e);
+        int reply_entry(struct fuse_req *req, const struct fuse_entry_param *e);
         
         /**
          * Reply with a directory entry and open parameters
@@ -204,7 +205,7 @@ protected:
          * @return zero for success, -errno for failure to send reply
          */
         int reply_data(struct fuse_bufvec *bufv,
-        		    enum fuse_buf_copy_flags flags);
+        		   int flags);
         
         /**
          * Reply with data vector
@@ -389,7 +390,7 @@ protected:
         bool interrupted();
 
     private:
-        struct fuse_req_t * fuse_req;
+        struct fuse_req *fuse_req;
     };
 
 	/**
@@ -423,7 +424,7 @@ protected:
 	 * @param parent inode number of the parent directory
 	 * @param name the name to look up
 	 */
-	virtual void lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
+	virtual void lookup(struct fuse_req *req, uint64_t parent, const char *name);
 
 	/**
 	 * Forget about an inode
@@ -461,7 +462,7 @@ protected:
 	 * @param ino the inode number
 	 * @param nlookup the number of lookups to forget
 	 */
-	virtual void forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup);
+	virtual void forget(struct fuse_req *req, uint64_t ino, unsigned long nlookup);
 
 	/**
 	 * Get file attributes
@@ -474,7 +475,7 @@ protected:
 	 * @param ino the inode number
 	 * @param fi for future use, currently always NULL
 	 */
-	virtual void getattr(fuse_req_t req, fuse_ino_t ino,
+	virtual void getattr(struct fuse_req *req, uint64_t ino,
 			 struct fuse_file_info *fi);
 
 	/**
@@ -504,7 +505,7 @@ protected:
 	 * Changed in version 2.5:
 	 *     file information filled in for ftruncate
 	 */
-	virtual void setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+	virtual void setattr(struct fuse_req *req, uint64_t ino, struct stat *attr,
 			 int to_set, struct fuse_file_info *fi);
 
 	/**
@@ -517,7 +518,7 @@ protected:
 	 * @param req request handle
 	 * @param ino the inode number
 	 */
-	virtual void readlink(fuse_req_t req, fuse_ino_t ino);
+	virtual void readlink(struct fuse_req *req, uint64_t ino);
 
 	/**
 	 * Create file node
@@ -535,7 +536,7 @@ protected:
 	 * @param mode file type and mode with which to create the new file
 	 * @param rdev the device number (only valid if created file is a device)
 	 */
-	virtual void mknod(fuse_req_t req, fuse_ino_t parent, const char *name,
+	virtual void mknod(struct fuse_req *req, uint64_t parent, const char *name,
 		       mode_t mode, dev_t rdev);
 
 	/**
@@ -550,7 +551,7 @@ protected:
 	 * @param name to create
 	 * @param mode with which to create the new file
 	 */
-	virtual void mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
+	virtual void mkdir(struct fuse_req *req, uint64_t parent, const char *name,
 		       mode_t mode);
 
 	/**
@@ -568,7 +569,7 @@ protected:
 	 * @param parent inode number of the parent directory
 	 * @param name to remove
 	 */
-	virtual void unlink(fuse_req_t req, fuse_ino_t parent, const char *name);
+	virtual void unlink(struct fuse_req *req, uint64_t parent, const char *name);
 
 	/**
 	 * Remove a directory
@@ -585,7 +586,7 @@ protected:
 	 * @param parent inode number of the parent directory
 	 * @param name to remove
 	 */
-	virtual void rmdir(fuse_req_t req, fuse_ino_t parent, const char *name);
+	virtual void rmdir(struct fuse_req *req, uint64_t parent, const char *name);
 
 	/**
 	 * Create a symbolic link
@@ -599,7 +600,7 @@ protected:
 	 * @param parent inode number of the parent directory
 	 * @param name to create
 	 */
-	virtual void symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
+	virtual void symlink(struct fuse_req *req, const char *link, uint64_t parent,
 			 const char *name);
 
 	/** Rename a file
@@ -619,8 +620,8 @@ protected:
 	 * @param newparent inode number of the new parent directory
 	 * @param newname new name
 	 */
-	virtual void rename(fuse_req_t req, fuse_ino_t parent, const char *name,
-			fuse_ino_t newparent, const char *newname);
+	virtual void rename(struct fuse_req *req, uint64_t parent, const char *name,
+			uint64_t newparent, const char *newname);
 
 	/**
 	 * Create a hard link
@@ -634,7 +635,7 @@ protected:
 	 * @param newparent inode number of the new parent directory
 	 * @param newname new name to create
 	 */
-	virtual void link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent,
+	virtual void link(struct fuse_req *req, uint64_t ino, uint64_t newparent,
 		      const char *newname);
 
 	/**
@@ -662,7 +663,7 @@ protected:
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	virtual void open(fuse_req_t req, fuse_ino_t ino,
+	virtual void open(struct fuse_req *req, uint64_t ino,
 		      struct fuse_file_info *fi);
 
 	/**
@@ -690,7 +691,7 @@ protected:
 	 * @param off offset to read from
 	 * @param fi file information
 	 */
-	virtual void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
+	virtual void read(struct fuse_req *req, uint64_t ino, size_t size, off_t off,
 		      struct fuse_file_info *fi);
 
 	/**
@@ -716,7 +717,7 @@ protected:
 	 * @param off offset to write to
 	 * @param fi file information
 	 */
-	virtual void write(fuse_req_t req, fuse_ino_t ino, const char *buf,
+	virtual void write(struct fuse_req *req, uint64_t ino, const char *buf,
 		       size_t size, off_t off, struct fuse_file_info *fi);
 
 	/**
@@ -748,7 +749,7 @@ protected:
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	virtual void flush(fuse_req_t req, fuse_ino_t ino,
+	virtual void flush(struct fuse_req *req, uint64_t ino,
 		       struct fuse_file_info *fi);
 
 	/**
@@ -775,7 +776,7 @@ protected:
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	virtual void release(fuse_req_t req, fuse_ino_t ino,
+	virtual void release(struct fuse_req *req, uint64_t ino,
 			 struct fuse_file_info *fi);
 
 	/**
@@ -792,7 +793,7 @@ protected:
 	 * @param datasync flag indicating if only data should be flushed
 	 * @param fi file information
 	 */
-	virtual void fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
+	virtual void fsync(struct fuse_req *req, uint64_t ino, int datasync,
 		       struct fuse_file_info *fi);
 
 	/**
@@ -816,7 +817,7 @@ protected:
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	virtual void opendir(fuse_req_t req, fuse_ino_t ino,
+	virtual void opendir(struct fuse_req *req, uint64_t ino,
 			 struct fuse_file_info *fi);
 
 	/**
@@ -840,7 +841,7 @@ protected:
 	 * @param off offset to continue reading the directory stream
 	 * @param fi file information
 	 */
-	virtual void readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
+	virtual void readdir(struct fuse_req *req, uint64_t ino, size_t size, off_t off,
 			 struct fuse_file_info *fi);
 
 	/**
@@ -859,7 +860,7 @@ protected:
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	virtual void releasedir(fuse_req_t req, fuse_ino_t ino,
+	virtual void releasedir(struct fuse_req *req, uint64_t ino,
 			    struct fuse_file_info *fi);
 
 	/**
@@ -879,7 +880,7 @@ protected:
 	 * @param datasync flag indicating if only data should be flushed
 	 * @param fi file information
 	 */
-	virtual void fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
+	virtual void fsyncdir(struct fuse_req *req, uint64_t ino, int datasync,
 			  struct fuse_file_info *fi);
 
 	/**
@@ -892,7 +893,7 @@ protected:
 	 * @param req request handle
 	 * @param ino the inode number, zero means "undefined"
 	 */
-	virtual void statfs(fuse_req_t req, fuse_ino_t ino);
+	virtual void statfs(struct fuse_req *req, uint64_t ino);
 
 	/**
 	 * Set an extended attribute
@@ -900,7 +901,7 @@ protected:
 	 * Valid replies:
 	 *   fuse_reply_err
 	 */
-	virtual void setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+	virtual void setxattr(struct fuse_req *req, uint64_t ino, const char *name,
 			  const char *value, size_t size, int flags);
 
 	/**
@@ -926,7 +927,7 @@ protected:
 	 * @param name of the extended attribute
 	 * @param size maximum size of the value to send
 	 */
-	virtual void getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+	virtual void getxattr(struct fuse_req *req, uint64_t ino, const char *name,
 			  size_t size);
 
 	/**
@@ -952,7 +953,7 @@ protected:
 	 * @param ino the inode number
 	 * @param size maximum size of the list to send
 	 */
-	virtual void listxattr(fuse_req_t req, fuse_ino_t ino, size_t size);
+	virtual void listxattr(struct fuse_req *req, uint64_t ino, size_t size);
 
 	/**
 	 * Remove an extended attribute
@@ -964,7 +965,7 @@ protected:
 	 * @param ino the inode number
 	 * @param name of the extended attribute
 	 */
-	virtual void removexattr(fuse_req_t req, fuse_ino_t ino, const char *name);
+	virtual void removexattr(struct fuse_req *req, uint64_t ino, const char *name);
 
 	/**
 	 * Check file access permissions
@@ -984,7 +985,7 @@ protected:
 	 * @param ino the inode number
 	 * @param mask requested access mode
 	 */
-	virtual void access(fuse_req_t req, fuse_ino_t ino, int mask);
+	virtual void access(struct fuse_req *req, uint64_t ino, int mask);
 
 	/**
 	 * Create and open a file
@@ -1019,7 +1020,7 @@ protected:
 	 * @param mode file type and mode with which to create the new file
 	 * @param fi file information
 	 */
-	virtual void create(fuse_req_t req, fuse_ino_t parent, const char *name,
+	virtual void create(struct fuse_req *req, uint64_t parent, const char *name,
 			mode_t mode, struct fuse_file_info *fi);
 
 	/**
@@ -1036,7 +1037,7 @@ protected:
 	 * @param fi file information
 	 * @param lock the region/type to test
 	 */
-	virtual void getlk(fuse_req_t req, fuse_ino_t ino,
+	virtual void getlk(struct fuse_req *req, uint64_t ino,
 		       struct fuse_file_info *fi, struct flock *lock);
 
 	/**
@@ -1063,7 +1064,7 @@ protected:
 	 * @param lock the region/type to set
 	 * @param sleep locking operation may sleep
 	 */
-	virtual void setlk(fuse_req_t req, fuse_ino_t ino,
+	virtual void setlk(struct fuse_req *req, uint64_t ino,
 		       struct fuse_file_info *fi,
 		       struct flock *lock, int sleep);
 
@@ -1084,7 +1085,7 @@ protected:
 	 * @param blocksize unit of block index
 	 * @param idx block index within file
 	 */
-	virtual void bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
+	virtual void bmap(struct fuse_req *req, uint64_t ino, size_t blocksize,
 		      uint64_t idx);
 
 	/**
@@ -1114,7 +1115,7 @@ protected:
 	 * @param in_bufsz number of fetched bytes
 	 * @param out_bufsz maximum size of output data
 	 */
-	virtual void ioctl(fuse_req_t req, fuse_ino_t ino, int cmd, void *arg,
+	virtual void ioctl(struct fuse_req *req, uint64_t ino, int cmd, void *arg,
 		       struct fuse_file_info *fi, unsigned flags,
 		       const void *in_buf, size_t in_bufsz, size_t out_bufsz);
 
@@ -1144,7 +1145,7 @@ protected:
 	 * @param fi file information
 	 * @param ph poll handle to be used for notification
 	 */
-	virtual void poll(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+	virtual void poll(struct fuse_req *req, uint64_t ino, struct fuse_file_info *fi,
 		      struct fuse_pollhandle *ph);
 
 	/**
@@ -1168,7 +1169,7 @@ protected:
 	 * @param off offset to write to
 	 * @param fi file information
 	 */
-	virtual void write_buf(fuse_req_t req, fuse_ino_t ino,
+	virtual void write_buf(struct fuse_req *req, uint64_t ino,
 			   struct fuse_bufvec *bufv, off_t off,
 			   struct fuse_file_info *fi);
 
@@ -1186,7 +1187,7 @@ protected:
 	 * @param offset the offset supplied to fuse_lowlevel_notify_retrieve()
 	 * @param bufv the buffer containing the returned data
 	 */
-	virtual void retrieve_reply(fuse_req_t req, void *cookie, fuse_ino_t ino,
+	virtual void retrieve_reply(struct fuse_req *req, void *cookie, uint64_t ino,
 				off_t offset, struct fuse_bufvec *bufv);
 
 	/**
@@ -1202,7 +1203,7 @@ protected:
 	 *
 	 * @param req request handle
 	 */
-	virtual void forget_multi(fuse_req_t req, size_t count,
+	virtual void forget_multi(struct fuse_req *req, size_t count,
 			      struct fuse_forget_data *forgets);
 
 	/**
@@ -1222,7 +1223,7 @@ protected:
 	 * @param fi file information
 	 * @param op the locking operation, see flock(2)
 	 */
-	virtual void flock(fuse_req_t req, fuse_ino_t ino,
+	virtual void flock(struct fuse_req *req, uint64_t ino,
 		       struct fuse_file_info *fi, int op);
 
 	/**
@@ -1242,7 +1243,7 @@ protected:
 	 * @param mode determines the operation to be performed on the given range,
 	 *             see fallocate(2)
 	 */
-	virtual void fallocate(fuse_req_t req, fuse_ino_t ino, int mode,
+	virtual void fallocate(struct fuse_req *req, uint64_t ino, int mode,
 		       off_t offset, off_t length, struct fuse_file_info *fi);
 
 private:
