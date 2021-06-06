@@ -81,10 +81,11 @@ public:
     struct stat st;
     (void)off;
     (void)fi;
+    (void)flags;
     std::vector<std::string> files = subfiles(pathname);
     for (size_t i = 0; i < files.size(); ++i) {
       getattr(files[i], &st);
-      fill_dir(this->files[files[i]].name, &st, flags);
+      fill_dir(this->files[files[i]].name, &st);
     }
     return 0;
   }
