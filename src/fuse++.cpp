@@ -1,4 +1,4 @@
-#include "../include/fuse++"
+#include <fuse++>
 
 #include <cerrno>
 #include <cstdlib>
