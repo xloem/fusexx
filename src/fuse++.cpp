@@ -10,10 +10,11 @@
 #endif
 
 #ifndef FUSE_USE_VERSION
-#define FUSE_USE_VERSION 26
+//#define FUSE_USE_VERSION 26 // only 2.6 is implemented, but fuse3 requires version 30
+#define FUSE_USE_VERSION 30
 #endif
 
-#include <fuse/fuse.h>
+#include <fuse.h>
 
 class fuse::detail
 {
@@ -34,18 +35,36 @@ public:
         return *fuseptr;
     }
 
+
+#if FUSE_VERSION < 30
     static int getattr(const char *pathname, struct stat *buf) { return fuse().getattr(pathname, buf); }
+#else // FUSE_VERSION < 30
+    static int getattr(const char *pathname, struct stat *buf, struct fuse_file_info *fi) { return fuse().getattr(pathname, buf); }
+    #warning fuse_file_info unimplemented getattr
+#endif
     static int readlink(const char *pathname, char *buffer, size_t size) { return fuse().readlink(pathname, buffer, size); }
     static int mknod(const char *pathname, mode_t mode, dev_t dev) { return fuse().mknod(pathname, mode, dev); }
     static int mkdir(const char *pathname, mode_t mode) { return fuse().mkdir(pathname, mode); }
     static int unlink(const char *pathname) { return fuse().unlink(pathname); }
     static int rmdir(const char *pathname) { return fuse().rmdir(pathname); }
     static int symlink(const char *target, const char *linkpath) { return fuse().symlink(target, linkpath); }
+#if FUSE_VERSION < 30
     static int rename(const char *oldpath, const char *newpath) { return fuse().rename(oldpath, newpath); }
+#else // FUSE_VERSION < 30
+    static int rename(const char *oldpath, const char *newpath, unsigned int flags) { return fuse().rename(oldpath, newpath, flags); }
+    #warning fuse_file_info unimplemented rename
+#endif
     static int link(const char *oldpath, const char *newpath) { return fuse().link(oldpath, newpath); }
+#if FUSE_VERSION < 30
     static int chmod(const char *pathname, mode_t mode) { return fuse().chmod(pathname, mode); }
     static int chown(const char *pathname, uid_t uid, gid_t gid) { return fuse().chown(pathname, uid, gid); }
     static int truncate(const char *path, off_t length) { return fuse().truncate(path, length); }
+#else // FUSE_VERSION < 30
+    static int chmod(const char *pathname, mode_t mode, struct fuse_file_info *fi) { return fuse().chmod(pathname, mode); }
+    static int chown(const char *pathname, uid_t uid, gid_t gid, struct fuse_file_info *fi) { return fuse().chown(pathname, uid, gid); }
+    static int truncate(const char *path, off_t length, struct fuse_file_info *fi) { return fuse().truncate(path, length); }
+    #warning fuse_file_info unimplemented chmod, chown, truncate
+#endif
     static int open(const char *pathname, struct fuse_file_info *fi) { return fuse().open(pathname, fi); }
     static int read(const char *pathname, char *buf, size_t count, off_t offset, struct fuse_file_info *fi) { return fuse().read(pathname, buf, count, offset, fi); }
     static int write(const char *pathname, const char *buf, size_t count, off_t offset, struct fuse_file_info *fi) { return fuse().write(pathname, buf, count, offset, fi); }
@@ -66,18 +85,32 @@ public:
     static int opendir(const char *opendir, struct fuse_file_info *fi) { return fuse().opendir(opendir, fi); }
 
     static thread_local fuse_fill_dir_t filler;
+    #if FUSE_VERSION < 30
     static int readdir(const char *pathname, void *buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info *fi)
     {
+        int flags = 0;
+    #else // FUSE_VERSION < 30
+    static int readdir(const char *pathname, void *buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
+    {
+    #endif
         detail::filler_handle = buf;
         detail::filler = filler;
-        return fuse().readdir(pathname, off, fi);
+        return fuse().readdir(pathname, off, fi, (fuse::readdir_flags)flags);
     }
 
     static int releasedir(const char *pathname, struct fuse_file_info *fi) { return fuse().releasedir(pathname, fi); }
     static int fsyncdir(const char *pathname, int datasync, struct fuse_file_info *fi) { return fuse().fsyncdir(pathname, datasync, fi); }
-        
+
+    #if FUSE_VERSION < 30
     static void *init(struct fuse_conn_info *conn)
     {
+        struct {
+        } cfg;
+    #else // FUSE_VERSION < 30
+    static void *init(struct fuse_conn_info *conn, struct fuse_config *cfg)
+    {
+    #warning fuse config unimplemented
+    #endif
         class fuse * fuseptr = &fuse();
         fuseptr->init();
         return fuseptr;
@@ -100,15 +133,16 @@ public:
     #if FUSE_VERSION >= 25
     static int access(const char *pathname, int mode) { return fuse().access(pathname, mode); }
     static int create(const char *pathname, mode_t mode, struct fuse_file_info *fi) { return fuse().create(pathname, mode, fi); }
-    static int ftruncate(const char *pathname, off_t length, struct fuse_file_info *fi) { return fuse().ftruncate(pathname, length, fi); }
-
-    static int fgetattr(const char *pathname, struct stat *buf, struct fuse_file_info *fi) { return fuse().fgetattr(pathname, buf, fi); }
-
     #endif // FUSE_VERSION >= 25
     
     #if FUSE_VERSION >= 26
     static int lock(const char *pathname, struct fuse_file_info *fi, int cmd, struct flock *lock) { return fuse().lock(pathname, fi, cmd, lock); }
+    #if FUSE_VERSION < 30
     static int utimens(const char *pathname, const struct timespec tv[2]) { return fuse().utimens(pathname, tv); }
+    #else // FUSE_VERSION < 30
+    static int utimens(const char *pathname, const struct timespec tv[2], struct fuse_file_info *fi) { return fuse().utimens(pathname, tv); }
+    #warning fuse_file_info unimplemented utimens
+    #endif
     static int bmap(const char *pathname, size_t blocksize, uint64_t *idx) { return fuse().bmap(pathname, blocksize, idx); }
     static int ioctl(const char *pathname, int cmd, void *arg, struct fuse_file_info *fi, unsigned int flags, void *data) { return fuse().ioctl(pathname, cmd, arg, fi, flags, data); }
     static int poll(const char *pathname, struct fuse_file_info *fi, struct fuse_pollhandle *ph, unsigned *reventsp) { return fuse().poll(pathname, fi, ph, reventsp); }
@@ -149,7 +183,7 @@ int fuse::mkdir(const std::string &pathname, mode_t mode) { return -ENOSYS; }
 int fuse::unlink(const std::string &pathname) { return -ENOSYS; }
 int fuse::rmdir(const std::string &pathname) { return -ENOSYS; }
 int fuse::symlink(const std::string &target, const std::string &linkpath) { return -ENOSYS; }
-int fuse::rename(const std::string &oldpath, const std::string &newpath) { return -ENOSYS; }
+int fuse::rename(const std::string &oldpath, const std::string &newpath, unsigned int flags) { return -ENOSYS; }
 int fuse::link(const std::string &oldpath, const std::string &newpath) { return -ENOSYS; }
 int fuse::chmod(const std::string &pathname, mode_t mode) { return -ENOSYS; }
 int fuse::chown(const std::string &pathname, uid_t uid, gid_t gid) { return -ENOSYS; }
@@ -171,11 +205,19 @@ int fuse::removexattr(const std::string &path, const std::string &name) { return
 
 #if FUSE_VERSION > 22
 int fuse::opendir(const std::string &opendir, struct fuse_file_info *fi) { return 0; }
-int fuse::readdir(const std::string &pathname, off_t off, struct fuse_file_info *fi) { return -ENOSYS; }
+int fuse::readdir(const std::string &pathname, off_t off, struct fuse_file_info *fi, fuse::readdir_flags flags) { return -ENOSYS; }
 
-int fuse::fill_dir(const std::string &name, const struct stat *stbuf, off_t off)
+int fuse::fill_dir(const std::string &name, const struct stat *stbuf, off_t off, fuse::fill_dir_flags flags)
 {
-    return detail::filler(detail::filler_handle, name.c_str(), stbuf, off);
+    return detail::filler(
+        detail::filler_handle,
+        name.c_str(),
+        stbuf,
+        off
+#if FUSE_VERSION >= 30
+        , (::fuse_fill_dir_flags)flags
+#endif
+    );
 }
 
 int fuse::releasedir(const std::string &pathname, struct fuse_file_info *fi) { return 0; }
@@ -192,17 +234,6 @@ int fuse::fill_dir(const std::string &name, const struct stat *stbuf, off_t off)
 #if FUSE_VERSION >= 25
 int fuse::access(const std::string &pathname, int mode) { return -ENOSYS; }
 int fuse::create(const std::string &pathname, mode_t mode, struct fuse_file_info *fi) { return -ENOSYS; }
-
-int fuse::ftruncate(const std::string &pathname, off_t length, struct fuse_file_info *fi)
-{
-    return truncate(pathname, length);
-}
-
-int fuse::fgetattr(const std::string &pathname, struct stat *buf, struct fuse_file_info *fi)
-{
-    return getattr(pathname, buf);
-}
-
 #endif // FUSE_VERSION >= 25
 
 #if FUSE_VERSION >= 26
@@ -275,11 +306,13 @@ int fuse::main(int argc, char *argv[])
     static struct fuse_operations ops = {
         .getattr     = fuse::detail::getattr,
         .readlink    = fuse::detail::readlink,
+    #if FUSE_VERSION < 30
     #if FUSE_VERSION > 22
         .getdir      = 0,
     #else
         .getdir      = fuse::detail::getdir,
-    #endif
+    #endif // FUSE_VERSION > 22
+    #endif // FUSE_VERSION < 30
         .mknod       = fuse::detail::mknod,
         .mkdir       = fuse::detail::mkdir,
         .unlink      = fuse::detail::unlink,
@@ -290,11 +323,13 @@ int fuse::main(int argc, char *argv[])
         .chmod       = fuse::detail::chmod,
         .chown       = fuse::detail::chown,
         .truncate    = fuse::detail::truncate,
+    #if FUSE_VERSION < 30
     #if FUSE_VERSION >= 26
         .utime       = 0,
     #else
         .utime       = fuse::detail::utime,
-    #endif
+    #endif // FUSE_VERSION >= 26
+    #endif // FUSE_VERSION < 30
         .open        = fuse::detail::open,
         .read        = fuse::detail::read,
         .write       = fuse::detail::write,
@@ -319,14 +354,19 @@ int fuse::main(int argc, char *argv[])
     #if FUSE_VERSION >= 25
         .access      = fuse::detail::access,
         .create      = fuse::detail::create,
-        .ftruncate   = fuse::detail::ftruncate,
-        .fgetattr    = fuse::detail::fgetattr,
+    #if FUSE_VERSION < 30
+        .ftruncate   = 0,
+        .fgetattr    = 0,
+    #endif // FUSE_VERSION < 30
     #endif // FUSE_VERSION >= 25
     #if FUSE_VERSION >= 26
         .lock        = fuse::detail::lock,
         .utimens     = fuse::detail::utimens,
         .bmap        = fuse::detail::bmap,
 
+    #if FUSE_VERSION < 30
+	// these flags are in struct fuse_config for fuse 3.x
+	
         /* these 2 flags apply to read, write, flush, release, fsync, readdir,
            releasedir, fsyncdir, ftruncate, fgetattr, lock, ioctl and poll */
         .flag_nullpath_ok = false, /* accept NULL pathnames, lets -ohard_remove work on unlinked files */
@@ -334,6 +374,7 @@ int fuse::main(int argc, char *argv[])
 
         .flag_utime_omit_ok = false, /* use UTIME_NOW, UTIME_OMIT in utimens */
         .flag_reserved = 0,
+    #endif // FUSE_VERSION < 30
 
         .ioctl       = fuse::detail::ioctl,
         .poll        = fuse::detail::poll,

@@ -90,6 +90,21 @@ protected:
 	 */
 	virtual int readlink(const std::string &pathname, char *buffer, size_t size);
 
+	/**
+	 * Readdir flags, passed to readdir()
+	 */
+	enum readdir_flags {
+		/**
+		 * "Plus" mode.
+		 *
+		 * The kernel wants to prefill the inode cache during readdir.  The
+		 * filesystem may honour this by filling in the attributes and setting
+		 * FILL_DIR_FLAGS for the filler function.  The filesystem may also
+		 * just ignore this flag completely.
+		 */
+		READDIR_PLUS = (1 << 0),
+	};
+
 	/** Read directory
 	 *
 	 * The filesystem may choose between two modes of operation:
@@ -105,16 +120,30 @@ protected:
      * (or an error happens), fill_dir will return '1'.
 	 */
 	virtual int readdir(const std::string &pathname, off_t off,
-        struct fuse_file_info *fi);
+        struct fuse_file_info *fi, readdir_flags flags = (readdir_flags)0);
+
+    enum fill_dir_flags {
+        /**
+         * "Plus" mode: all file attributes are valid
+         *
+         * The attributes are used by the kernel to prefill the inode cache
+         * during a readdir.
+         *
+         * It is okay to set FILL_DIR_PLUS if READDIR_PLUS is not set
+         * and vice versa.
+         */
+        FILL_DIR_PLUS = (1 << 1),
+    };
 
     /** Function to add an entry in a readdir() operation
      *
      * @param name the file name of the directory entry
      * @param stbuf file attributes, can be NULL
      * @param off offset of the next entry or zero
+     * @param flags fill flags
      * @return 1 if buffer is full, zero otherwise
      */
-    int fill_dir(const std::string &name, const struct stat *stbuf, off_t off = 0);
+    int fill_dir(const std::string &name, const struct stat *stbuf, off_t off = 0, fill_dir_flags flags = (fill_dir_flags)0);
 
 	/** Create a file node
 	 *
@@ -142,7 +171,7 @@ protected:
 	virtual int symlink(const std::string &target, const std::string &linkpath);
 
 	/** Rename a file */
-	virtual int rename(const std::string &oldpath, const std::string &newpath);
+	virtual int rename(const std::string &oldpath, const std::string &newpath, unsigned int flags = 0);
 
 	/** Create a hard link to a file */
 	virtual int link(const std::string &oldpath, const std::string &newpath);
@@ -346,36 +375,6 @@ protected:
 	 * Introduced in version 2.5
 	 */
 	virtual int create(const std::string &pathname, mode_t mode,
-        struct fuse_file_info *fi);
-
-	/**
-	 * Change the size of an open file
-	 *
-	 * This method is called instead of the truncate() method if the
-	 * truncation was invoked from an ftruncate() system call.
-	 *
-	 * If this method is not implemented or under Linux kernel
-	 * versions earlier than 2.6.15, the truncate() method will be
-	 * called instead.
-	 *
-	 * Introduced in version 2.5
-	 */
-	virtual int ftruncate(const std::string &pathname, off_t length,
-        struct fuse_file_info *fi);
-
-	/**
-	 * Get attributes from an open file
-	 *
-	 * This method is called instead of the getattr() method if the
-	 * file information is available.
-	 *
-	 * Currently this is only called after the create() method if that
-	 * is implemented (see above).  Later it may be called for
-	 * invocations of fstat() too.
-	 *
-	 * Introduced in version 2.5
-	 */
-	virtual int fgetattr(const std::string &pathname, struct stat *buf,
         struct fuse_file_info *fi);
 
 	/**

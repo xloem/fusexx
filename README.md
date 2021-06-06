@@ -6,8 +6,9 @@ This is presently a partial implementation, with a goal of exceeding what is
 presently available from alternative libraries such as
 [Fusepp](https://github.com/jachappell/Fusepp).  The basics of the "easy"
 interface are in [`#include <fuse++>`](include/fuse++) and hopefully are mostly
-working.  The lowlevel interface is not implemented yet, but the [lowlevel
-header](include/fuse++_lowlevel) is stubbed out.
+working with feature parity up to fuse 2.6 and stability through fuse 3.0.  The
+lowlevel interface is not implemented yet, but a
+[lowlevel header](include/fuse++_lowlevel) is stubbed out.
 
 Feel free to extend this library, or maybe I will complete it.
 

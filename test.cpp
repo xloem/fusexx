@@ -6,6 +6,10 @@
 #include <map>
 #include <vector>
 
+#if __cplusplus < 201103L
+#define override
+#endif
+
 class FS : public fuse
 {
 public:
@@ -54,7 +58,7 @@ public:
 
     /* reading functions */
 
-    int getattr(const std::string &pathname, struct stat *st)
+    int getattr(const std::string &pathname, struct stat *st) override
     {
         memset(st, 0, sizeof(*st));
         st->st_uid = uid;
@@ -69,7 +73,7 @@ public:
         }
     }
 
-    int readdir(const std::string &pathname, off_t off, struct fuse_file_info *fi)
+    int readdir(const std::string &pathname, off_t off, struct fuse_file_info *fi, readdir_flags flags) override
     {
         struct stat st;
         std::vector<std::string> files = subfiles(pathname);
@@ -80,7 +84,7 @@ public:
         return 0;
     }
 
-    int read(const std::string &pathname, char *buf, size_t count, off_t offset, struct fuse_file_info *fi)
+    int read(const std::string &pathname, char *buf, size_t count, off_t offset, struct fuse_file_info *fi) override
     {
         std::string &content = files[pathname].content;
         if (count + offset > content.size()) {
@@ -96,7 +100,7 @@ public:
 
     /* writing functions */
 
-    int chmod(const std::string &pathname, mode_t mode)
+    int chmod(const std::string &pathname, mode_t mode) override
     {
         if (files.count(pathname)) {
             files[pathname].mode = mode;
@@ -106,7 +110,7 @@ public:
         }
     }
 
-    int write(const std::string &pathname, const char *buf, size_t count, off_t offset, struct fuse_file_info *fi)
+    int write(const std::string &pathname, const char *buf, size_t count, off_t offset, struct fuse_file_info *fi) override
     {
         std::string & content = files[pathname].content;
         size_t precount = offset + count > content.size() ? content.size() - offset : count;
@@ -114,7 +118,7 @@ public:
         return count;
     }
 
-    int truncate(const std::string &pathname, off_t length)
+    int truncate(const std::string &pathname, off_t length) override
     {
         if (files.count(pathname)) {
             files[pathname].content.resize(length);
@@ -124,25 +128,25 @@ public:
         }
     }
 
-    int mknod(const std::string &pathname, mode_t mode, dev_t dev)
+    int mknod(const std::string &pathname, mode_t mode, dev_t dev) override
     {
         files[pathname] = File(pathname.substr(pathname.rfind('/') + 1), mode);
         return 0;
     }
 
-    int mkdir(const std::string &pathname, mode_t mode)
+    int mkdir(const std::string &pathname, mode_t mode) override
     {
         files[pathname] = File(pathname.substr(pathname.rfind('/') + 1), S_IFDIR | mode);
         return 0;
     }
 
-    int unlink(const std::string &pathname)
+    int unlink(const std::string &pathname) override
     {
         files.erase(pathname);
         return 0;
     }
 
-    int rmdir(const std::string &pathname)
+    int rmdir(const std::string &pathname) override
     {
         if (subfiles(pathname).size() != 0) {
             return -ENOTEMPTY;
@@ -152,19 +156,19 @@ public:
         }
     }
 
-    int rename(const std::string &oldpath, const std::string &newpath)
+    int rename(const std::string &oldpath, const std::string &newpath, unsigned int flags) override
     {
         int result = 0;
         size_t idx;
 
         std::vector<std::string> subfiles = this->subfiles(oldpath);
         for (idx = 0; idx < subfiles.size() && 0 == result; ++ idx) {
-            result = rename(subfiles[idx], newpath + subfiles[idx].substr(oldpath.size()));
+            result = rename(subfiles[idx], newpath + subfiles[idx].substr(oldpath.size()), flags);
         }
         if (result != 0) {
             while (idx > 0) {
                 -- idx;
-                rename(newpath + subfiles[idx].substr(oldpath.size()), subfiles[idx]);
+                rename(newpath + subfiles[idx].substr(oldpath.size()), subfiles[idx], flags);
             }
         } else {
             File file = files[oldpath];
